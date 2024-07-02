@@ -2,12 +2,12 @@
 // ========================================================
 import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
-         isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
+         isPrimOp, isProcExp,isTypePredExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp, Program, StrExp, parseL5Program } from "./L5-ast";
+         Parsed, PrimOp, ProcExp,TypePredicateExp, Program, StrExp, parseL5Program } from "./L5-ast";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
-         parseTE, unparseTExp, makeUnionTExp,
+         parseTE, unparseTExp, makeUnionTExp,isTypePredTExp,makeTypePredTExp,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, isSubType } from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, either } from '../shared/result';
@@ -59,6 +59,7 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
     isVarRef(exp) ? applyTEnv(tenv, exp.var) :
     isIfExp(exp) ? typeofIf(exp, tenv) :
     isProcExp(exp) ? typeofProc(exp, tenv) :
+    isTypePredExp(exp) ? :
     isAppExp(exp) ? typeofApp(exp, tenv) :
     isLetExp(exp) ? typeofLet(exp, tenv) :
     isLetrecExp(exp) ? typeofLetrec(exp, tenv) :
