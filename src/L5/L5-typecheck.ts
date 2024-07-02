@@ -59,7 +59,7 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
     isVarRef(exp) ? applyTEnv(tenv, exp.var) :
     isIfExp(exp) ? typeofIf(exp, tenv) :
     isProcExp(exp) ? typeofProc(exp, tenv) :
-    isTypePredExp(exp) ? :
+    isTypePredExp(exp) ? typeofPred(exp, tenv):
     isAppExp(exp) ? typeofApp(exp, tenv) :
     isLetExp(exp) ? typeofLet(exp, tenv) :
     isLetrecExp(exp) ? typeofLetrec(exp, tenv) :
@@ -162,6 +162,14 @@ export const typeofProc = (proc: ProcExp, tenv: TEnv): Result<TExp> => {
     const constraint1 = bind(typeofExps(proc.body, extTEnv), (body: TExp) => 
                             checkCompatibleType(body, proc.returnTE, proc));
     return bind(constraint1, _ => makeOk(makeProcTExp(argsTEs, proc.returnTE)));
+};
+
+export const typeofPred = (pred: TypePredicateExp, tenv: TEnv): Result<TExp> => {
+    const argsTEs = map((vd) => vd.texp, pred.args);
+    const extTEnv = makeExtendTEnv(map((vd) => vd.var, pred.args), argsTEs, tenv);
+    const constraint1 = bind(typeofExps(pred.body, extTEnv), (body: TExp) => 
+                            checkCompatibleType(body, pred.returnTE, pred));
+    return bind(constraint1, _ => makeOk(makeProcTExp(argsTEs, pred.returnTE)));
 };
 
 // Purpose: compute the type of an app-exp
