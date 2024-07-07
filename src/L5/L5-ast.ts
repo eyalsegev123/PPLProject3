@@ -70,7 +70,7 @@ export const isAtomicExp = (x: any): x is AtomicExp =>
     isNumExp(x) || isBoolExp(x) || isStrExp(x) ||
     isPrimOp(x) || isVarRef(x);
 
-export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp | LetrecExp | SetExp | TypePredicateExp;
+export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp | LetrecExp | SetExp;
 export const isCompoundExp = (x: any): x is CompoundExp =>
     isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x) || isLetrecExp(x) || isSetExp(x);
 export const expComponents = (e: Exp): CExp[] =>
@@ -131,11 +131,6 @@ export type ProcExp = {tag: "ProcExp"; args: VarDecl[], body: CExp[]; returnTE: 
 export const makeProcExp = (args: VarDecl[], body: CExp[], returnTE: TExp): ProcExp =>
     ({tag: "ProcExp", args: args, body: body, returnTE: returnTE});
 export const isProcExp = (x: any): x is ProcExp => x.tag === "ProcExp";
-
-export type TypePredicateExp = {tag: "TypePredicateExp"; args:VarDecl[], body: CExp[]; returnTE: TExp }
-export const makeTypePredExp = (args: VarDecl[], body: CExp[], returnTE: TExp ): TypePredicateExp =>
-    ({tag: "TypePredicateExp", args: args, body: body, returnTE: returnTE});
-export const isTypePredExp = (x: any): x is TypePredicateExp => x.tag === "TypePredicateExp";
 
 export type Binding = {tag: "Binding"; var: VarDecl; val: CExp; }
 export const makeBinding = (v: VarDecl, val: CExp): Binding =>
@@ -254,8 +249,6 @@ const parseIfExp = (params: Sexp[]): Result<IfExp> =>
     mapv(mapResult(parseL5CExp, params), (cexps: CExp[]) => 
         makeIfExp(cexps[0], cexps[1], cexps[2]));
 
-const parseProcOrTypePredExp = (vars: Sexp, rest: Sexp[]): Result<ProcExp | TypePredicateExp> =>
-    rest[1] === "is?" ? parseTypePredExp(vars,rest) : parseProcExp(vars,rest);
 
 // (lambda (<vardecl>*) [: returnTE]? <CExp>+)
 const parseProcExp = (vars: Sexp, rest: Sexp[]): Result<ProcExp> => {
@@ -267,20 +260,6 @@ const parseProcExp = (vars: Sexp, rest: Sexp[]): Result<ProcExp> => {
                     bind(body, (body: CExp[]) =>
                         mapv(returnTE, (returnTE: TExp) =>
                             makeProcExp(args, body, returnTE))));
-    } else {
-        return makeFailure(`Invalid args ${format(vars)}`)
-    }
-}
-
-const parseTypePredExp = (vars: Sexp, rest: Sexp[]): Result<TypePredicateExp> => {
-    if (isArray(vars)) {
-        const args = mapResult(parseVarDecl, vars);
-        const body = mapResult(parseL5CExp, rest[0] === ":" && rest[1] === "is?" ? rest.slice(3) : rest);
-        const returnTE = rest[0] === ":" ? parseTExp(rest[1]) : makeOk(makeFreshTVar());
-        return bind(args, (args: VarDecl[]) =>
-                    bind(body, (body: CExp[]) =>
-                        mapv(returnTE, (returnTE: TExp) =>
-                            makeTypePredExp(args, body, returnTE))));
     } else {
         return makeFailure(`Invalid args ${format(vars)}`)
     }
@@ -389,7 +368,6 @@ export const unparse = (e: Parsed): Result<string> =>
     isLetExp(e) ? unparseLetExp(e) :
     isLetrecExp(e) ? unparseLetrecExp(e) :
     isProcExp(e) ? unparseProcExp(e) :
-    isTypePredExp(e) ? unparseTypePredExp(e) :
     isLitExp(e) ? makeOk(unparseLitExp(e)) :
     isSetExp(e) ? unparseSetExp(e) :
     // DefineExp | Program
@@ -429,13 +407,7 @@ const unparseProcExp = (pe: ProcExp): Result<string> =>
             mapv(unparseLExps(pe.body), (body: string) =>
             `(lambda (${join(" ", vds)})${ret} ${body})`)));
 
-const unparseTypePredExp = (pe: TypePredicateExp): Result<string> =>
-    bind(mapResult(unparseVarDecl, pe.args), (vds: string[]) =>
-        bind(unparseReturn(pe.returnTE), (ret: string) =>
-            mapv(unparseLExps(pe.body), (body: string) =>
-            `(lambda (${join(" ", vds)})${ret} ${body})`)));
     
-
 const unparseLetExp = (le: LetExp) : Result<string> => 
     bind(unparseBindings(le.bindings), (bdgs: string) =>
         mapv(unparseLExps(le.body), (body: string) => 

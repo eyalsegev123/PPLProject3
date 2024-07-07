@@ -2,13 +2,14 @@
 // ========================================================
 import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
-         isPrimOp, isProcExp,isTypePredExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
+         isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp,TypePredicateExp, Program, StrExp, parseL5Program } from "./L5-ast";
+         Parsed, PrimOp, ProcExp, Program, StrExp, parseL5Program } from "./L5-ast";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
-import { isProcOrPredicateTExp, isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
+import { isProcOrPredicateTExp, isProcTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp, makeUnionTExp,isTypePredTExp,makeTypePredTExp,
-         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, isSubType } from "./TExp";
+         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, isSubType, 
+         isPredTExp, makePredTExp, typePredTExp, makeBoolTExp} from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, either } from '../shared/result';
 import { parse as p } from "../shared/parser";
@@ -59,7 +60,6 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
     isVarRef(exp) ? applyTEnv(tenv, exp.var) :
     isIfExp(exp) ? typeofIf(exp, tenv) :
     isProcExp(exp) ? typeofProc(exp, tenv) :
-    isTypePredExp(exp) ? typeofPred(exp, tenv):
     isAppExp(exp) ? typeofApp(exp, tenv) :
     isLetExp(exp) ? typeofLet(exp, tenv) :
     isLetrecExp(exp) ? typeofLetrec(exp, tenv) :
@@ -141,16 +141,19 @@ export const typeofIfNormal = (ifExp: IfExp, tenv: TEnv): Result<TExp> => {
                 constraint2);
 };
 
+
 // L52 Structured methods
-const isTypePredApp = (e: Exp, tenv: TEnv): Result<{/* Add parameters */}> => {
+const isTypePredApp = (e: Exp, tenv: TEnv): Result<boolean> => {
+    if (!isAppExp(e)) {
+        return makeOk(false);
+    }
+    return bind(typeofExp(e.rator, tenv), ratorTE => {
+        return makeOk(isTypePredTExp(ratorTE));
+    });
+};
 
-}
-
-export const typeofIf = (ifExp: IfExp, tenv: TEnv): Result<TExp> =>
-    either(
-        bind (isTypePredApp(ifExp.test, tenv), ({/* Add parameter here */}) => {}),
-        makeOk,
-        () => typeofIfNormal(ifExp, tenv));
+export const typeofIf = (ifExp: IfExp, tenv: TEnv): Result<TExp> => 
+    typeofIfNormal(ifExp, tenv)
 
 
 // Purpose: compute the type of a proc-exp
@@ -162,16 +165,11 @@ export const typeofProc = (proc: ProcExp, tenv: TEnv): Result<TExp> => {
     const extTEnv = makeExtendTEnv(map((vd) => vd.var, proc.args), argsTEs, tenv);
     const constraint1 = bind(typeofExps(proc.body, extTEnv), (body: TExp) => 
                             checkCompatibleType(body, proc.returnTE, proc));
-    return bind(constraint1, _ => makeOk(makeProcTExp(argsTEs, proc.returnTE)));
+    if(isProcExp(proc.returnTE))
+            return bind(constraint1, _ => makeOk(makeProcTExp(argsTEs, proc.returnTE)));
+    return  bind(constraint1, _ => makeOk(makeTypePredTExp(argsTEs, proc.returnTE)));
 };
 
-export const typeofPred = (pred: TypePredicateExp, tenv: TEnv): Result<TExp> => {
-    const argsTEs = map((vd) => vd.texp, pred.args);
-    const extTEnv = makeExtendTEnv(map((vd) => vd.var, pred.args), argsTEs, tenv);
-    const constraint1 = bind(typeofExps(pred.body, extTEnv), (body: TExp) => 
-                            checkCompatibleType(body, pred.returnTE, pred));
-    return bind(constraint1, _ => makeOk(makeTypePredTExp(argsTEs, pred.returnTE)));
-};
 
 // Purpose: compute the type of an app-exp
 // Typing rule:
