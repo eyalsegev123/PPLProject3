@@ -9,7 +9,9 @@ import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
 import { isProcOrPredicateTExp, isProcTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp, makeUnionTExp,isTypePredTExp,makeTypePredTExp,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, isSubType, 
-         isPredTExp, makePredTExp, typePredTExp, makeBoolTExp} from "./TExp";
+         isPredTExp, makePredTExp, typePredTExp, makeBoolTExp,
+         predTExp,
+         makeDiffTExp} from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, either } from '../shared/result';
 import { parse as p } from "../shared/parser";
@@ -143,17 +145,34 @@ export const typeofIfNormal = (ifExp: IfExp, tenv: TEnv): Result<TExp> => {
 
 
 // L52 Structured methods
-const isTypePredApp = (e: Exp, tenv: TEnv): Result<boolean> => {
-    if (!isAppExp(e)) {
-        return makeOk(false);
+const isTypePredApp = (e: Exp, tenv: TEnv): Result<typePredTExp> => 
+    isAppExp(e) ? isPredTExp(e.rator) ? makeOk(e.rator) : makeFailure("") :
+    makeFailure("")
+
+    
+
+const checkIf = (ifExp : IfExp, tenv : TEnv, pred : typePredTExp) : Result<TExp> => {
+    if(!isAppExp(ifExp.test) || !isVarRef(ifExp.test.rands[0])){
+        return makeFailure("")
     }
-    return bind(typeofExp(e.rator, tenv), ratorTE => {
-        return makeOk(isTypePredTExp(ratorTE));
-    });
+    const variable = ifExp.test.rands[0]
+    const thenTE = typeofExp(ifExp.then, makeExtendTEnv([variable.var],[pred.result],tenv))
+    const altTE = bind(typeofExp(variable,tenv), (te : TExp) => 
+                        bind(makeOk(makeDiffTExp(te,pred.result)),
+                                 (te1 : TExp) => typeofExp(ifExp.alt,makeExtendTEnv([variable.var],[te1],tenv))))
+    const constraint2 = bind(thenTE, (thenTE : TExp) => 
+                            bind(altTE, (altTE : TExp) => makeOk(makeUnion(thenTE,altTE))))
+    return constraint2
 };
 
+
+
 export const typeofIf = (ifExp: IfExp, tenv: TEnv): Result<TExp> => 
-    typeofIfNormal(ifExp, tenv)
+    either(
+        bind(isTypePredApp(ifExp.test,tenv) , (exp : typePredTExp) =>   
+                    checkIf(ifExp,tenv,exp)), makeOk, () => typeofIfNormal(ifExp, tenv)
+        );
+    
 
 
 // Purpose: compute the type of a proc-exp
