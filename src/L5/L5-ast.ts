@@ -254,8 +254,8 @@ const parseIfExp = (params: Sexp[]): Result<IfExp> =>
 const parseProcExp = (vars: Sexp, rest: Sexp[]): Result<ProcExp> => {
     if (isArray(vars)) {
         const args = mapResult(parseVarDecl, vars);
-        const body = mapResult(parseL5CExp, rest[0] === ":" ? rest.slice(2) : rest);
-        const returnTE = rest[0] === ":" ? parseTExp(rest[1]) : makeOk(makeFreshTVar());
+        const body = mapResult(parseL5CExp, rest[0] === ":" ? (rest[1] === "is?" ? rest.slice(3) : rest.slice(2)) : rest);
+        const returnTE = rest[0] === ":" ? (rest[1] === "is?" ? parseTExp(['is?', rest[2]]):  parseTExp(rest[1])) : makeOk(makeFreshTVar());
         return bind(args, (args: VarDecl[]) =>
                     bind(body, (body: CExp[]) =>
                         mapv(returnTE, (returnTE: TExp) =>
